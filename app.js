@@ -222,20 +222,160 @@ function esc(s) {
 }
 
 /* ─────────────────────────── SDK / API ─────────────────────────── */
+/* Эндпоинты отвечают под /api/ только на родном хосте приложения (tgcloud).
+   При хостинге статики в другом месте (github.io) POST /api/* невозможен (405),
+   поэтому транспорт выбирается ОДИН РАЗ пробой (первый вызов — read-only
+   getState), после чего откат запрещён — эндпоинты сайд-эффектны:
+   1) tg.invokeCustomMethod — MTProto-канал через клиент ТГ (не зависит от хоста);
+   2) tg.Serverless.call — POST /api/<name> на текущий origin (родной хост). */
+
+function endpointError(message, status, type, parameters) {
+  const err = new Error(message);
+  err.name = 'ServerlessError';
+  if (status != null) err.status = status;
+  if (type) err.type = type;
+  if (parameters) err.parameters = parameters;
+  return err;
+}
+
+// Огиб /api/: {ok:true, result} | {ok:false, description, error_code, error_type, parameters}
+function unwrapEnvelope(name, raw) {
+  let d = raw;
+  if (typeof d === 'string') {
+    try { d = JSON.parse(d); } catch (e) { return raw; }
+  }
+  if (d && typeof d === 'object' && typeof d.ok === 'boolean') {
+    if (!d.ok) {
+      throw endpointError(
+        d.description || ('Endpoint ' + name + ' failed'),
+        d.error_code || 0, d.error_type || '', d.parameters);
+    }
+    return d.result;
+  }
+  return d;
+}
+
+function normalizeErr(name, err) {
+  if (err && typeof err === 'object' && err.message) return err;
+  let d = err;
+  if (typeof d === 'string') {
+    try { d = JSON.parse(d); } catch (e) { return endpointError(String(err), 0); }
+  }
+  if (d && typeof d === 'object' && typeof d.ok === 'boolean' && !d.ok) {
+    return endpointError(d.description || ('Endpoint ' + name + ' failed'),
+      d.error_code || 0, d.error_type || '', d.parameters);
+  }
+  return endpointError((d && d.message) || ('Endpoint ' + name + ' failed'), 0);
+}
+
+function callCustom(name, data, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject({ type: 'CUSTOM_TIMEOUT', message: 'custom method timeout' });
+    }, timeoutMs || 12000);
+    try {
+      tg.invokeCustomMethod(name, data || {}, (err, res) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (err) reject(err);
+        else resolve(res);
+      });
+    } catch (e) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject({ type: 'CUSTOM_UNSUPPORTED', message: e && e.message });
+    }
+  });
+}
+
+function callServerless(name, data, resolve, reject) {
+  try {
+    tg.Serverless.call(name, data, (err, result) => {
+      if (err) reject(err);
+      else resolve(result);
+    });
+  } catch (e) {
+    reject({ type: 'CLIENT', message: e && e.message });
+  }
+}
+
+// Проба: огиб с ok:false UNAUTHORIZED → канал жив, но initData не приложен → /api/;
+// огиб с любым другим ответом → роутинг есть → MTProto; таймаут/мусор → /api/.
+function decideTransport(err, res) {
+  let d = err != null ? err : res;
+  if (typeof d === 'string') {
+    try { d = JSON.parse(d); } catch (e) { d = null; }
+  }
+  if (d && typeof d === 'object' && typeof d.ok === 'boolean') {
+    if (!d.ok && (d.error_code === 401 || d.error_type === 'UNAUTHORIZED')) return 'api';
+    return 'custom';
+  }
+  return 'api';
+}
+
+let TRANSPORT = null;        // 'custom' | 'api' — фиксируется после пробы
+let probeInFlight = false;
+let transportResolve = null;
+const transportReady = new Promise((r) => { transportResolve = r; });
+
 function apiCall(name, data) {
   return new Promise((resolve, reject) => {
-    if (!tg || !tg.Serverless || typeof tg.Serverless.call !== 'function') {
+    if (!tg) { reject({ type: 'NO_SDK', message: t('update_app') }); return; }
+    const hasCustom = typeof tg.invokeCustomMethod === 'function';
+    const hasSls = !!(tg.Serverless && typeof tg.Serverless.call === 'function');
+    if (!hasCustom && !hasSls) {
       reject({ type: 'NO_SDK', message: t('update_app') });
       return;
     }
-    try {
-      tg.Serverless.call(name, data || {}, (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    } catch (e) {
-      reject({ type: 'CLIENT', message: e && e.message });
+
+    const runWith = (tr) => {
+      if (tr === 'custom') {
+        if (!hasCustom) { callServerless(name, data || {}, resolve, reject); return; }
+        callCustom(name, data, 12000).then(
+          (res) => resolve(unwrapEnvelope(name, res)),
+          (err) => reject(normalizeErr(name, err)));
+      } else {
+        if (!hasSls) {
+          callCustom(name, data, 12000).then(
+            (res) => resolve(unwrapEnvelope(name, res)),
+            (err) => reject(normalizeErr(name, err)));
+          return;
+        }
+        callServerless(name, data || {}, resolve, reject);
+      }
+    };
+
+    if (TRANSPORT) { runWith(TRANSPORT); return; }
+    if (probeInFlight) { transportReady.then(() => runWith(TRANSPORT)); return; }
+    probeInFlight = true;
+
+    // ── проба: сам вызов и есть проба (первый getState, read-only) ──
+    if (!hasCustom || !hasSls) {
+      TRANSPORT = hasCustom ? 'custom' : 'api';
+      transportResolve();
+      runWith(TRANSPORT);
+      return;
     }
+    callCustom(name, data, 8000).then(
+      (res) => {
+        TRANSPORT = decideTransport(null, res);
+        transportResolve();
+        console.info('[api] transport =', TRANSPORT);
+        if (TRANSPORT === 'custom') resolve(unwrapEnvelope(name, res));
+        else callServerless(name, data || {}, resolve, reject);
+      },
+      (err) => {
+        TRANSPORT = decideTransport(err, null);
+        transportResolve();
+        console.info('[api] transport =', TRANSPORT, '(probe err:', err && (err.type || err.message), ')');
+        if (TRANSPORT === 'custom') reject(normalizeErr(name, err));
+        else callServerless(name, data || {}, resolve, reject);
+      });
   });
 }
 
@@ -2245,7 +2385,9 @@ async function init() {
   try { tg.ready(); tg.expand(); } catch (e) {}
   applyTheme();
 
-  if (!tg.Serverless || typeof tg.Serverless.call !== 'function') {
+  const hasSls = !!(tg.Serverless && typeof tg.Serverless.call === 'function');
+  const hasCustom = typeof tg.invokeCustomMethod === 'function';
+  if (!hasSls && !hasCustom) {
     renderErrorScreen(t('update_app'));
     return;
   }
