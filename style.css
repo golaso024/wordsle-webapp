@@ -1,0 +1,587 @@
+/* ============================================================
+   Wordle Mini App — дизайн-система Telegram Web (telegram-tt)
+   Токены из src/styles/themes.json и _variables.scss (Ajaxy/telegram-tt)
+   ============================================================ */
+
+:root {
+  /* light theme — значения из themes.json (колонка 1) */
+  --bg: #FFFFFF;
+  --bg-secondary: #F4F4F5;
+  --bg-sidebar: #E4E4E5;
+  --primary: #3390EC;
+  --primary-shade: #4a95d6;
+  --primary-tint: rgba(51, 144, 236, 0.10);
+  --own: #EEFFDE;
+  --own-meta: #4FAE4E;
+  --text: #000000;
+  --text-secondary: #707579;
+  --borders: #DADCE0;
+  --dividers: #EFEFEF;
+  --item-hover: #F4F4F5;
+  --item-active: #EDEDED;
+  --green: #00C73E;
+  --danger: #E53935;
+  --warning: #FB8C00;
+  --toast-bg: rgba(32, 32, 32, 0.80);
+  --shadow-island: 0 1px 4px 0 rgba(0, 0, 0, 0.05);
+  --shadow-pane: 0 1px 5px -1px rgba(0, 0, 0, 0.21);
+
+  /* плитки Wordle (светлая) */
+  --tile-empty-bg: #FFFFFF;
+  --tile-empty-border: #DADCE0;
+  --tile-fill-bg: #FFFFFF;
+  --tile-fill-border: #A2ACB4;
+  --tile-correct: #4FAE4E;
+  --tile-present: #E0A32E;
+  --tile-absent: #8D919A;
+  --key-bg: #FFFFFF;
+  --key-bg-alt: #C4C9CC;
+  --key-shadow: 0 1px 1px rgba(114, 114, 114, 0.25);
+
+  /* радиусы из _variables.scss */
+  --r-btn: 1.75rem;        /* pill-кнопки */
+  --r-modal: 1.25rem;
+  --r-island: 1rem;
+  --r-list: 0.625rem;
+  --r-bubble: 0.9375rem;   /* 15px — радиус сообщений ТГ */
+  --r-tile: 0.55rem;
+
+  --font: system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', 'Apple Color Emoji', 'Helvetica Neue', sans-serif;
+  --slide: 300ms cubic-bezier(0.25, 1, 0.5, 1);
+  --layer: 300ms cubic-bezier(0.33, 1, 0.68, 1);
+  --header-h: 56px;
+}
+
+html.dark {
+  /* dark theme — колонка 2 themes.json */
+  --bg: #212121;
+  --bg-secondary: #0F0F0F;
+  --bg-sidebar: #0F0F0F;
+  --primary: #8774E1;
+  --primary-shade: #7b71c6;
+  --primary-tint: rgba(135, 116, 225, 0.14);
+  --own: #766AC8;
+  --own-meta: rgba(255, 255, 255, 0.6);
+  --text: #FFFFFF;
+  --text-secondary: #AAAAAA;
+  --borders: #303030;
+  --dividers: #2C2C2C;
+  --item-hover: #2C2C2C;
+  --item-active: #292929;
+  --toast-bg: rgba(0, 0, 0, 0.80);
+  --shadow-island: 0 1px 4px 0 rgba(0, 0, 0, 0.4);
+  --shadow-pane: 0 1px 5px -1px rgba(0, 0, 0, 0.5);
+
+  --tile-empty-bg: #212121;
+  --tile-empty-border: #3B3B3D;
+  --tile-fill-bg: #212121;
+  --tile-fill-border: #565658;
+  --tile-correct: #4C9E4B;
+  --tile-present: #B08B25;
+  --tile-absent: #3A3A3D;
+  --key-bg: #333333;
+  --key-bg-alt: #1F1F1F;
+  --key-shadow: none;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg-secondary);
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+#app { height: 100%; display: flex; flex-direction: column; }
+
+/* ---------- Хедер в стиле ТГ ---------- */
+.header {
+  height: var(--header-h);
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 10px;
+  background: var(--bg);
+  position: relative; z-index: 5;
+}
+.header::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 1px; background: var(--dividers);
+  opacity: 0; transition: opacity .2s;
+}
+.header.scrolled::after { opacity: 1; }
+.h-btn {
+  width: 40px; height: 40px; border: none; border-radius: 50%;
+  background: transparent; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .15s;
+}
+.h-btn:active { background: var(--item-active); }
+.h-btn svg { width: 24px; height: 24px; fill: currentColor; }
+.h-title { font-size: 17px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.h-sub { font-size: 12px; color: var(--text-secondary); font-weight: 400; }
+.h-action {
+  border: none; background: var(--primary-tint); color: var(--primary);
+  font-family: var(--font); font-size: 14px; font-weight: 500;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer; transition: filter .15s;
+}
+.h-action:active { filter: brightness(.92); }
+
+.page {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+/* ---------- Переходы экранов (slide из _variables) ---------- */
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg-secondary); }
+.stage { position: relative; flex: 1; overflow: hidden; }
+.screen.anim-in { animation: slideIn var(--slide) both; }
+.screen.anim-in-back { animation: slideInBack var(--slide) both; }
+.screen.anim-out { animation: slideOut var(--slide) both; }
+.screen.anim-out-back { animation: slideOutBack var(--slide) both; }
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes slideInBack { from { transform: translateX(-30%); opacity: .6; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideOut { from { transform: translateX(0); } to { transform: translateX(-30%); opacity: 0; } }
+@keyframes slideOutBack { from { transform: translateX(0); } to { transform: translateX(100%); } }
+
+/* ---------- Острова-карточки (island из ТГ-настроек) ---------- */
+.island {
+  background: var(--bg);
+  border-radius: var(--r-island);
+  box-shadow: var(--shadow-island);
+  margin: 8px 10px;
+  overflow: hidden;
+}
+.island-title {
+  font-size: 14px; font-weight: 500; color: var(--text-secondary);
+  padding: 14px 16px 6px;
+}
+.list { display: flex; flex-direction: column; }
+.list-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 16px; min-height: 52px;
+  cursor: pointer; user-select: none;
+  position: relative; width: 100%;
+  border: none; background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 15px; text-align: left;
+  transition: background .15s;
+}
+.list-item:active { background: var(--item-active); }
+.list-item + .list-item::before {
+  content: ''; position: absolute; top: 0; left: 16px; right: 0;
+  height: 1px; background: var(--dividers);
+}
+.li-ico {
+  width: 32px; height: 32px; border-radius: 50%; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; color: #fff;
+}
+.li-text { flex: 1; min-width: 0; }
+.li-title { font-size: 15px; font-weight: 500; }
+.li-sub { font-size: 13px; color: var(--text-secondary); margin-top: 1px; }
+.li-value { font-size: 15px; color: var(--text-secondary); }
+.li-chevron { width: 8px; height: 8px; border-right: 2px solid var(--text-secondary); border-top: 2px solid var(--text-secondary); transform: rotate(45deg); opacity: .55; flex: 0 0 auto; margin-left: 4px; }
+
+/* ---------- Кнопки ---------- */
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; min-height: 50px; padding: 12px 20px;
+  border: none; border-radius: var(--r-btn);
+  font-family: var(--font); font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: transform .12s, filter .15s, background .15s;
+  background: var(--item-hover); color: var(--text);
+}
+.btn:active { transform: scale(.97); filter: brightness(.95); }
+.btn:disabled { opacity: .5; pointer-events: none; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-green { background: var(--green); color: #fff; }
+.btn-tint { background: var(--primary-tint); color: var(--primary); }
+.btn-danger { background: rgba(229, 57, 53, .12); color: var(--danger); }
+.btn-row { display: flex; gap: 8px; padding: 8px 10px; }
+.btn-row .btn { flex: 1; }
+
+/* ---------- Инпуты ---------- */
+.input {
+  width: 100%; min-height: 50px; padding: 12px 16px;
+  border: 1px solid var(--borders); border-radius: 12px;
+  background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 16px;
+  outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-tint); }
+.input::placeholder { color: #A2ACB4; }
+.field-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin: 12px 4px 6px; }
+
+/* ---------- Чипы и сегменты ---------- */
+.chips { display: flex; gap: 8px; }
+.chip {
+  flex: 1; padding: 11px 0; border: 1.5px solid var(--borders); border-radius: 12px;
+  background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 15px; font-weight: 500; cursor: pointer;
+  transition: all .15s;
+}
+.chip.on { border-color: var(--primary); background: var(--primary-tint); color: var(--primary); }
+
+/* ---------- Аватары (градиенты как в ТГ) ---------- */
+.avatar {
+  border-radius: 50%; color: #fff; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  text-transform: uppercase; flex: 0 0 auto; user-select: none;
+}
+
+/* ---------- Профиль (хедер home) ---------- */
+.profile-card { display: flex; align-items: center; gap: 14px; padding: 16px; }
+.profile-name { font-size: 18px; font-weight: 600; }
+.profile-sub { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+.stats-row { display: flex; }
+.stat {
+  flex: 1; text-align: center; padding: 12px 4px; position: relative;
+}
+.stat + .stat::before { content: ''; position: absolute; left: 0; top: 20%; bottom: 20%; width: 1px; background: var(--dividers); }
+.stat-num { font-size: 19px; font-weight: 700; color: var(--primary); }
+.stat-label { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+/* ---------- Табло Wordle ---------- */
+.board { display: flex; flex-direction: column; gap: 7px; align-items: center; padding: 14px 8px 4px; }
+.row { display: flex; gap: 7px; }
+.row.shake { animation: shake .5s; }
+@keyframes shake {
+  10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-6px); } 40%, 60% { transform: translateX(6px); }
+}
+.tile {
+  width: 58px; height: 58px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--tile-empty-border); border-radius: var(--r-tile);
+  background: var(--tile-empty-bg);
+  font-size: 27px; font-weight: 700; line-height: 1;
+  color: var(--text); text-transform: uppercase;
+  transition: border-color .12s, background .12s;
+}
+.tile.filled { border-color: var(--tile-fill-border); background: var(--tile-fill-bg); animation: pop .16s ease; }
+@keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.09); } 100% { transform: scale(1); } }
+.tile.correct, .tile.present, .tile.absent { color: #fff; border-color: transparent; animation: flip .5s ease both; }
+.tile.still { animation: none !important; }
+.tile.correct { background: var(--tile-correct); }
+.tile.present { background: var(--tile-present); }
+.tile.absent { background: var(--tile-absent); }
+@keyframes flip {
+  0% { transform: rotateX(0); background: var(--tile-fill-bg); border-color: var(--tile-fill-border); }
+  49% { transform: rotateX(90deg); color: transparent; }
+  50% { transform: rotateX(90deg); color: transparent; }
+  100% { transform: rotateX(0); }
+}
+.tile.small { width: 44px; height: 44px; font-size: 20px; border-width: 2px; }
+
+/* мини-плитки соперников (только цвета) */
+.mini-row { display: flex; gap: 3px; margin-top: 3px; }
+.mini {
+  width: 14px; height: 14px; border-radius: 4px;
+  background: var(--tile-empty-bg); border: 1.5px solid var(--tile-empty-border);
+}
+.mini.g { background: var(--tile-correct); border-color: transparent; }
+.mini.y { background: var(--tile-present); border-color: transparent; }
+.mini.b { background: var(--tile-absent); border-color: transparent; }
+
+/* ---------- Клавиатура ---------- */
+.kb { padding: 6px 4px calc(8px + env(safe-area-inset-bottom)); user-select: none; }
+.kb-row { display: flex; justify-content: center; gap: 5px; margin-bottom: 8px; }
+.key {
+  flex: 1; max-width: 42px; height: 52px;
+  border: none; border-radius: 7px;
+  background: var(--key-bg); color: var(--text);
+  box-shadow: var(--key-shadow);
+  font-family: var(--font); font-size: 16px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .12s, transform .08s;
+}
+.key:active { transform: scale(.94); }
+.key.wide { flex: 1.7; max-width: 72px; background: var(--key-bg-alt); font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.key.correct { background: var(--tile-correct); color: #fff; }
+.key.present { background: var(--tile-present); color: #fff; }
+.key.absent { background: var(--tile-absent); color: #fff; }
+html.dark .key { box-shadow: none; }
+
+/* ---------- Соперники (пати-раунд) ---------- */
+.opp-strip { display: flex; gap: 8px; overflow-x: auto; padding: 10px 10px 6px; }
+.opp-card {
+  flex: 0 0 auto; min-width: 132px;
+  background: var(--bg); border-radius: var(--r-island);
+  box-shadow: var(--shadow-island);
+  padding: 10px 12px;
+}
+.opp-top { display: flex; align-items: center; gap: 8px; }
+.opp-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 88px; }
+.opp-status { font-size: 11px; color: var(--text-secondary); }
+.opp-status.done { color: var(--own-meta); font-weight: 600; }
+
+/* ---------- Подсказка загадывающего (custom-режим) ---------- */
+.hint-banner {
+  margin: 2px 10px 8px;
+  background: var(--primary-tint);
+  border-radius: var(--r-island);
+  padding: 10px 14px;
+  text-align: center;
+  animation: hintIn .3s cubic-bezier(.25, 1, .5, 1);
+}
+@keyframes hintIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.hint-text { font-size: 15px; font-weight: 700; color: var(--primary); }
+.hint-sub { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
+
+/* ---------- Список игроков (лобби) ---------- */
+.player-row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; position: relative; }
+.player-row + .player-row::before { content: ''; position: absolute; top: 0; left: 60px; right: 0; height: 1px; background: var(--dividers); }
+.inv-mini { width: auto; min-height: 0; padding: 7px 14px; font-size: 13px; border-radius: 999px; flex: 0 0 auto; }
+.badge {
+  font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+  background: var(--primary-tint); color: var(--primary);
+}
+.badge.gray { background: var(--item-hover); color: var(--text-secondary); }
+.badge.green { background: rgba(0, 199, 62, .12); color: var(--green); }
+.badge.yellow { background: rgba(224, 163, 46, .15); color: #B07C1E; }
+
+/* ---------- Код комнаты ---------- */
+.code-box {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px; cursor: pointer;
+}
+.code-val { font-size: 32px; font-weight: 800; letter-spacing: 6px; color: var(--primary); }
+
+/* ---------- Подиум и результаты ---------- */
+.podium { display: flex; align-items: flex-end; justify-content: center; gap: 10px; padding: 18px 12px 6px; }
+.pod { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; max-width: 110px; }
+.pod .avatar { box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+.pod-place { font-size: 20px; }
+.pod-name { font-size: 13px; font-weight: 600; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pod-guesses { font-size: 12px; color: var(--text-secondary); }
+
+/* ---------- Чат (bottom sheet) ---------- */
+.sheet-backdrop {
+  position: absolute; inset: 0; z-index: 40;
+  background: rgba(0, 0, 0, .25);
+  opacity: 0; pointer-events: none; transition: opacity var(--layer);
+}
+.sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 41;
+  height: 78%; display: flex; flex-direction: column;
+  background: var(--bg-secondary);
+  border-radius: 16px 16px 0 0;
+  transform: translateY(102%); transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: var(--shadow-pane);
+}
+.sheet.open { transform: translateY(0); }
+.sheet-header {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+  background: var(--bg); border-radius: 16px 16px 0 0;
+  border-bottom: 1px solid var(--dividers);
+}
+.sheet-title { font-size: 16px; font-weight: 600; flex: 1; }
+.sheet-note { font-size: 11px; color: var(--text-secondary); text-align: center; padding: 6px; }
+.chat-list { flex: 1; overflow-y: auto; padding: 10px 12px 4px; display: flex; flex-direction: column; gap: 4px; }
+.msg { max-width: 78%; padding: 8px 12px; border-radius: var(--r-bubble); background: var(--bg); box-shadow: var(--shadow-island); }
+.msg.mine { align-self: flex-end; background: var(--own); border-bottom-right-radius: 4px; }
+.msg.theirs { align-self: flex-start; border-bottom-left-radius: 4px; }
+.msg-nick { font-size: 12px; font-weight: 600; color: var(--primary); margin-bottom: 2px; }
+.msg.mine .msg-nick { color: var(--own-meta); }
+.msg-text { font-size: 15px; line-height: 1.35; word-break: break-word; white-space: pre-wrap; }
+.msg-time { font-size: 10px; color: var(--text-secondary); text-align: right; margin-top: 2px; opacity: .8; }
+.chat-composer {
+  display: flex; gap: 8px; padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+  background: var(--bg);
+}
+.chat-input {
+  flex: 1; border: none; outline: none; background: var(--item-hover);
+  border-radius: 999px; padding: 12px 18px;
+  font-family: var(--font); font-size: 15px; color: var(--text);
+}
+.send-btn {
+  width: 46px; height: 46px; flex: 0 0 auto; border: none; border-radius: 50%;
+  background: var(--primary); color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.send-btn svg { width: 22px; height: 22px; fill: currentColor; }
+
+/* FAB чата */
+.fab {
+  position: absolute; right: 14px; bottom: calc(130px + env(safe-area-inset-bottom));
+  width: 52px; height: 52px; border-radius: 50%; border: none;
+  background: var(--primary); color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,.25); z-index: 20;
+  transition: transform .15s;
+}
+.fab:active { transform: scale(.92); }
+.fab svg { width: 24px; height: 24px; fill: currentColor; }
+.fab-badge {
+  position: absolute; top: -3px; right: -3px; min-width: 20px; height: 20px;
+  border-radius: 10px; background: var(--danger); color: #fff;
+  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  padding: 0 5px;
+}
+
+/* ---------- Онбординг ---------- */
+.onb { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 24px 20px; max-width: 480px; margin: 0 auto; width: 100%; }
+.onb-logo { display: flex; gap: 8px; justify-content: center; margin-bottom: 18px; }
+.onb-logo .tile { width: 46px; height: 46px; font-size: 0; }
+.onb-logo .tile::after { font-size: 20px; font-weight: 800; }
+.onb-logo .tile:nth-child(1)::after { content: 'W'; background: var(--tile-correct); color: #fff; width: 100%; height: 100%; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.onb-logo .tile:nth-child(2)::after { content: 'O'; background: var(--tile-present); color: #fff; width: 100%; height: 100%; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.onb-logo .tile:nth-child(3)::after { content: 'R'; background: var(--tile-absent); color: #fff; width: 100%; height: 100%; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.onb-title { font-size: 24px; font-weight: 700; text-align: center; }
+.onb-sub { font-size: 14px; color: var(--text-secondary); text-align: center; margin: 6px 0 22px; line-height: 1.4; }
+
+/* ---------- Тост (как в ТГ) ---------- */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
+  background: var(--toast-bg); color: #fff;
+  padding: 11px 18px; border-radius: 12px;
+  font-size: 14px; z-index: 100; pointer-events: none;
+  opacity: 0; transition: all .25s; max-width: 86vw; text-align: center;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- Спиннер ---------- */
+.spin {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 3px solid var(--primary-tint); border-top-color: var(--primary);
+  animation: rot .8s linear infinite; margin: 0 auto;
+}
+@keyframes rot { to { transform: rotate(360deg); } }
+.center-wrap { padding: 60px 0; display: flex; flex-direction: column; gap: 14px; align-items: center; color: var(--text-secondary); font-size: 14px; }
+
+.empty-note { padding: 28px 20px; text-align: center; color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
+
+/* сегменты языка */
+.seg { display: flex; background: var(--item-hover); border-radius: 999px; padding: 3px; gap: 3px; }
+.seg button {
+  flex: 1; border: none; border-radius: 999px; padding: 8px 0;
+  background: transparent; color: var(--text-secondary);
+  font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: all .15s;
+}
+.seg button.on { background: var(--bg); color: var(--text); box-shadow: var(--shadow-island); }
+html.dark .seg button.on { background: var(--item-active); }
+
+.link-btn {
+  background: none; border: none; color: var(--primary);
+  font-family: var(--font); font-size: 15px; font-weight: 500; cursor: pointer; padding: 10px;
+}
+
+@media (max-width: 380px) {
+  .tile { width: 50px; height: 50px; font-size: 23px; }
+  .tile.small { width: 38px; height: 38px; font-size: 17px; }
+  .key { height: 48px; }
+}
+@media (max-height: 700px) {
+  .tile { width: 46px; height: 46px; font-size: 21px; }
+  .tile.small { width: 36px; height: 36px; font-size: 16px; }
+  .key { height: 42px; }
+  .kb { padding-top: 2px; }
+  .kb-row { margin-bottom: 6px; }
+}
+@media (min-width: 500px) {
+  .page, .screen { max-width: 520px; margin: 0 auto; width: 100%; }
+  .stage { display: flex; justify-content: center; background: var(--bg-sidebar); }
+  .screen { background: var(--bg-secondary); }
+}
+
+/* ============================================================
+   Друзья / чат друзей / pill-уведомления / профиль-щит
+   ============================================================ */
+
+/* ---------- Pill-уведомления сверху (въезжают и заезжают обратно) ---------- */
+#pillHost {
+  position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 0; right: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  z-index: 90; pointer-events: none;
+}
+.pill {
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 10px;
+  max-width: 88%;
+  background: var(--toast-bg); color: #fff;
+  border-radius: 999px; padding: 7px 18px 7px 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .28);
+  transform: translateY(-160%); opacity: 0;
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity .32s;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.pill.in { transform: translateY(0); opacity: 1; }
+.pill.out { transform: translateY(-160%); opacity: 0; }
+.pill.tappable { cursor: pointer; }
+.pill.tappable:active { transform: translateY(0) scale(.97); }
+.pill-col { min-width: 0; }
+.pill-text { font-size: 13.5px; font-weight: 500; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }
+.pill-sub { font-size: 11.5px; opacity: .75; margin-top: 1px; }
+
+/* спинrefresh-иконка в чате */
+.h-btn.spinning svg { animation: rot .8s linear infinite; }
+
+/* ---------- Друзья: список ---------- */
+.badge.red { background: var(--danger); color: #fff; }
+.round-btn {
+  width: 38px; height: 38px; border-radius: 50%; border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex: 0 0 auto; transition: transform .12s, filter .15s;
+}
+.round-btn:active { transform: scale(.9); }
+.round-btn svg { width: 20px; height: 20px; fill: currentColor; }
+.round-btn.green { background: rgba(0, 199, 62, .14); color: var(--green); }
+.round-btn.red { background: rgba(229, 57, 53, .12); color: var(--danger); }
+.btn-mini {
+  border: none; border-radius: 999px; padding: 7px 14px;
+  background: var(--item-hover); color: var(--text-secondary);
+  font-family: var(--font); font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.btn-mini:active { filter: brightness(.93); }
+.tappable-row { cursor: pointer; }
+.tappable-row:active { background: var(--item-active); }
+
+/* ---------- Личный чат с другом (полноэкранный) ---------- */
+.fchat-page {
+  display: flex; flex-direction: column;
+  overflow: hidden; padding-bottom: 0 !important;
+}
+.fchat-page .chat-list { flex: 1; padding-bottom: 8px; }
+
+/* карточка-приглос в пати */
+.msg.invite-msg { max-width: 86%; }
+.inv-card {
+  background: var(--primary-tint); border-radius: 12px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+  min-width: 190px;
+}
+.inv-head { font-size: 12.5px; font-weight: 600; color: var(--primary); }
+.inv-code { font-size: 22px; font-weight: 800; letter-spacing: 4px; color: var(--text); text-align: center; }
+.inv-btn { min-height: 40px; padding: 8px 16px; font-size: 14px; }
+
+/* ---------- ⓘ на лидерборде ---------- */
+.info-btn {
+  width: 34px; height: 34px; border-radius: 50%; border: none;
+  background: transparent; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex: 0 0 auto; transition: background .15s, color .15s;
+}
+.info-btn:active { background: var(--item-active); color: var(--primary); }
+.info-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+/* ---------- Щит профиля (sheet-auto) ---------- */
+.sheet.sheet-auto { height: auto; max-height: 84%; overflow-y: auto; }
+.profile-body { padding: 6px 0 10px; }
+.profile-head { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 16px 6px; }
+.profile-head-name { font-size: 19px; font-weight: 700; }
+.profile-head-sub { font-size: 13px; color: var(--text-secondary); }
+.fr-big { margin: 6px 16px 10px; width: calc(100% - 32px); }
+.fr-big:disabled { opacity: .55; }
+.tg-plane { width: 20px; height: 20px; fill: currentColor; flex: 0 0 auto; }
+
+/* ── Слово дня: результат, шеринг, обратный отсчёт ── */
+.share-row { display:flex; gap:10px; justify-content:center; margin:14px 0 10px; }
+.share-row .btn { flex:0 1 auto; min-width:120px; }
+.daily-meta { text-align:center; font-size:14px; color:var(--text-secondary); margin:4px 0 2px; }
+.daily-meta b { color:var(--text); }
+.daily-count { text-align:center; font-size:13px; color:var(--text-secondary); margin-top:6px;
+  font-variant-numeric: tabular-nums; }
