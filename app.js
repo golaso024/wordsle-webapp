@@ -222,12 +222,12 @@ function esc(s) {
 }
 
 /* ─────────────────────────── SDK / API ─────────────────────────── */
-/* Эндпоинты отвечают под /api/ только на родном хосте приложения (tgcloud).
-   При хостинге статики в другом месте (github.io) POST /api/* невозможен (405),
-   поэтому транспорт выбирается ОДИН РАЗ пробой (первый вызов — read-only
-   getState), после чего откат запрещён — эндпоинты сайд-эффектны:
-   1) tg.invokeCustomMethod — MTProto-канал через клиент ТГ (не зависит от хоста);
-   2) tg.Serverless.call — POST /api/<name> на текущий origin (родной хост). */
+/* Эндпоинты отвечают под /api/ на родном хосте приложения (tgcloud) и на
+   хостах с прокси (vercel.json rewrite → tgcloud). Транспорт фиксируется
+   первой попыткой: сначала /api/ (Serverless.call); если хост не умеет
+   /api/ (404/405, например github.io) и клиент умеет invokeCustomMethod —
+   переключаемся на MTProto-канал через клиент ТГ. Переключение туда-обратно
+   запрещено: эндпоинты сайд-эффектны (двойной вызов сжигает попытку). */
 
 function endpointError(message, status, type, parameters) {
   const err = new Error(message);
@@ -304,21 +304,7 @@ function callServerless(name, data, resolve, reject) {
   }
 }
 
-// Проба: огиб с ok:false UNAUTHORIZED → канал жив, но initData не приложен → /api/;
-// огиб с любым другим ответом → роутинг есть → MTProto; таймаут/мусор → /api/.
-function decideTransport(err, res) {
-  let d = err != null ? err : res;
-  if (typeof d === 'string') {
-    try { d = JSON.parse(d); } catch (e) { d = null; }
-  }
-  if (d && typeof d === 'object' && typeof d.ok === 'boolean') {
-    if (!d.ok && (d.error_code === 401 || d.error_type === 'UNAUTHORIZED')) return 'api';
-    return 'custom';
-  }
-  return 'api';
-}
-
-let TRANSPORT = null;        // 'custom' | 'api' — фиксируется после пробы
+let TRANSPORT = null;        // 'api' | 'custom' — фиксируется первой попыткой
 let probeInFlight = false;
 let transportResolve = null;
 const transportReady = new Promise((r) => { transportResolve = r; });
@@ -333,49 +319,42 @@ function apiCall(name, data) {
       return;
     }
 
-    const runWith = (tr) => {
-      if (tr === 'custom') {
-        if (!hasCustom) { callServerless(name, data || {}, resolve, reject); return; }
-        callCustom(name, data, 12000).then(
-          (res) => resolve(unwrapEnvelope(name, res)),
-          (err) => reject(normalizeErr(name, err)));
-      } else {
-        if (!hasSls) {
-          callCustom(name, data, 12000).then(
-            (res) => resolve(unwrapEnvelope(name, res)),
-            (err) => reject(normalizeErr(name, err)));
-          return;
-        }
-        callServerless(name, data || {}, resolve, reject);
-      }
-    };
+    const viaSls = () => callServerless(name, data || {}, resolve, reject);
+    const viaCustom = () => callCustom(name, data, 12000).then(
+      (res) => resolve(unwrapEnvelope(name, res)),
+      (err) => reject(normalizeErr(name, err)));
+
+    const runWith = (tr) => (tr === 'custom') ? viaCustom() : viaSls();
 
     if (TRANSPORT) { runWith(TRANSPORT); return; }
     if (probeInFlight) { transportReady.then(() => runWith(TRANSPORT)); return; }
     probeInFlight = true;
 
-    // ── проба: сам вызов и есть проба (первый getState, read-only) ──
-    if (!hasCustom || !hasSls) {
-      TRANSPORT = hasCustom ? 'custom' : 'api';
+    // ── проба: сначала /api/ — мгновенно на родном хосте и на прокси-хостах ──
+    if (!hasSls) {
+      TRANSPORT = 'custom';
       transportResolve();
-      runWith(TRANSPORT);
+      viaCustom();
       return;
     }
-    callCustom(name, data, 8000).then(
-      (res) => {
-        TRANSPORT = decideTransport(null, res);
+    callServerless(name, data || {}, (result) => {
+      TRANSPORT = 'api';
+      transportResolve();
+      resolve(result);
+    }, (err) => {
+      const status = err && err.status;
+      if ((status === 404 || status === 405) && hasCustom) {
+        // на этом хосте /api/ нет → MTProto-канал через клиент ТГ
+        TRANSPORT = 'custom';
         transportResolve();
-        console.info('[api] transport =', TRANSPORT);
-        if (TRANSPORT === 'custom') resolve(unwrapEnvelope(name, res));
-        else callServerless(name, data || {}, resolve, reject);
-      },
-      (err) => {
-        TRANSPORT = decideTransport(err, null);
+        console.info('[api] /api/ недоступен (' + status + ') → transport = custom');
+        viaCustom();
+      } else {
+        TRANSPORT = 'api';
         transportResolve();
-        console.info('[api] transport =', TRANSPORT, '(probe err:', err && (err.type || err.message), ')');
-        if (TRANSPORT === 'custom') reject(normalizeErr(name, err));
-        else callServerless(name, data || {}, resolve, reject);
-      });
+        reject(err);
+      }
+    });
   });
 }
 
